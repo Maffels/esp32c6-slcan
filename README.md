@@ -10,6 +10,16 @@ Minimal ESP32-C6 USB-CAN adapter using the Lawicel SLCAN protocol over USB CDC.
 
 This is a quick adaptation of the excellent TWAI-based sketch from https://github.com/mintynet/esp32-slcan (esp32-twai-can folder) for the user's exact hardware and 500 kbit/s monitoring use-case with a Kvaser Leaf Light v2.
 
+## Tested & Working (2026-07-14)
+
+Confirmed working on ESP32-C6 with MCP2562 (GPIO1=TX, GPIO2=RX):
+
+- `python -m can.viewer -i slcan -c COM8 --bitrate 500000`
+- CanMoon (via Kvaser Leaf Light v2) sending messages over the bus
+- Bidirectional traffic at 500 kbit/s
+
+The adapter appears as a standard SLCAN device on COM8 after flashing.
+
 ## Quick Start (Arduino IDE)
 
 1. Install Arduino IDE + ESP32 board support (3.x+ recommended for TWAI).
