@@ -33,6 +33,18 @@ The adapter appears as a standard SLCAN device on COM8 after flashing.
 
 ```bash
 pip install python-can pyserial
+cd esp32c6-slcan
+python slcan_monitor_gui.py
+python slcan_monitor_gui.py COM8
+```
+
+GUI: pick adapter (slcan / kvaser / virtual). Latest frame per CAN ID (not a scrollback). Auto-scan BJM1 / EJM1 / BJM2 (type, SA, priority). Select a source for axis/button tables.
+
+Terminal log only: `python monitor_example.py COM8`.
+
+Optional PATH name `slcan-monitor` is `slcan-monitor.cmd` in this repo (copy onto PATH, or keep a one-line wrapper). `--cli` runs `monitor_example.py`.
+
+```bash
 python -m can.viewer -i slcan -c COMxx --bitrate 500000
 ```
 

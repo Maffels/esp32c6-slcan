@@ -30,9 +30,11 @@ def main():
         bus = can.Bus(
             interface="slcan",
             channel=port,
-            bitrate=bitrate,
-            sleep_after_open=0.2
+            sleep_after_open=0.2,
         )
+        # python-can 4.6: Bus(bitrate=...) calls set_bitrate(rate, None) and
+        # treats None as an invalid CAN-FD data rate. 0 = classic CAN (S6, no Y).
+        bus.set_bitrate(bitrate, 0)
     except Exception as e:
         print(f"Failed to open: {e}")
         print("Check the COM port (use Device Manager or list_ports).")
