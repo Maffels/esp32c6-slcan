@@ -42,7 +42,12 @@ GUI: pick adapter (slcan / kvaser / virtual). Latest frame per CAN ID (not a scr
 
 Terminal log only: `python monitor_example.py COM8`.
 
-Optional PATH name `slcan-monitor` is `slcan-monitor.cmd` in this repo (copy onto PATH, or keep a one-line wrapper). `--cli` runs `monitor_example.py`.
+Optional PATH name `slcan-monitor` is **not** created by `git pull`. This repo has `slcan-monitor.cmd` (GUI; `--cli` → `monitor_example.py`). On a new Windows lab PC the local agent must recreate `C:\code\bin` wrappers — full recipe: sibling **`ESP_Can_Bridge_v01/documentation/lab-path-wrappers.md`**. Short form: ensure `C:\code\bin` is on the user PATH and contains:
+
+```bat
+@echo off
+call "%~dp0..\repos\esp32c6-slcan\slcan-monitor.cmd" %*
+```
 
 ```bash
 python -m can.viewer -i slcan -c COMxx --bitrate 500000
