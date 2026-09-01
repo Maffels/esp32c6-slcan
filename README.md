@@ -38,9 +38,11 @@ python slcan_monitor_gui.py
 python slcan_monitor_gui.py COM8
 ```
 
-GUI: pick adapter (slcan / kvaser / virtual). Latest frame per CAN ID (not a scrollback). Auto-scan BJM1 / EJM1 / BJM2 (type, SA, priority). Select a source for axis/button tables.
+GUI: pick adapter (slcan / kvaser / virtual) and bitrate **500 kbit/s** (S6, default) or **250 kbit/s** (S5). Latest frame per CAN ID (not a scrollback). Auto-scan BJM1 / EJM1 / BJM2 (type, SA, priority). Select a source for axis/button tables. CLI: `python slcan_monitor_gui.py COM8 --bitrate 250000`.
 
-Terminal log only: `python monitor_example.py COM8`.
+Offline: `python -m pytest test_bitrate_modes.py`.
+
+Terminal log only: `python monitor_example.py COM8` or `python monitor_example.py COM8 250000`.
 
 Optional PATH name `slcan-monitor` is **not** created by `git pull`. This repo has `slcan-monitor.cmd` (GUI; `--cli` → `monitor_example.py`). On a new Windows lab PC the local agent must recreate `C:\code\bin` wrappers — full recipe: sibling **`ESP_Can_Bridge_v01/documentation/lab-path-wrappers.md`**. Short form: ensure `C:\code\bin` is on the user PATH and contains:
 
@@ -65,6 +67,7 @@ bus.shutdown()
 ## Commands (standard Lawicel SLCAN)
 
 - `S6` + `O` : 500 kbit/s, open
+- `S5` + `O` : 250 kbit/s, open
 - `C` : close
 - `t<id><len><data>` / `T<...>` for transmit (std/ext)
 - Received frames come back in the same format

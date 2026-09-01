@@ -65,8 +65,25 @@ ADAPTERS = ("slcan", "kvaser", "virtual")
 ADAPTER_CHANNEL = {"slcan": "COM8", "kvaser": "0", "virtual": "0"}
 
 POLL_MS = 50
-DEFAULT_BITRATE = 500000
+BITRATE_500K = 500000
+BITRATE_250K = 250000
+DEFAULT_BITRATE = BITRATE_500K
 DEFAULT_DATA_BITRATE = 0
+BITRATE_MODES = (BITRATE_500K, BITRATE_250K)
+BITRATE_MODE_LABELS = {
+    BITRATE_500K: "500 kbit/s (J1939-14)",
+    BITRATE_250K: "250 kbit/s (J1939-11)",
+}
+
+
+def parse_bitrate_mode(text) -> int:
+    """Accept 500000 / 250000, labels, or kbit/s numbers 500 / 250."""
+    raw = str(text).strip().lower().replace(",", "")
+    if raw.startswith("250"):
+        return BITRATE_250K
+    if raw.startswith("500"):
+        return BITRATE_500K
+    raise ValueError(f"bitrate must be 500000 or 250000, got {text!r}")
 
 
 def pgn_of(can_id: int) -> int:
@@ -205,6 +222,7 @@ class SlcanMonitorGui:
         self.root.geometry("1100x720")
         self.interface_var = tk.StringVar(value=interface if interface in ADAPTERS else "slcan")
         self.channel_var = tk.StringVar(value=port)
+        self.bitrate_var = tk.StringVar(value=BITRATE_MODE_LABELS[DEFAULT_BITRATE])
         self._build()
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         self.root.after(POLL_MS, self._drain)
@@ -228,6 +246,17 @@ class SlcanMonitorGui:
         self.channel_lbl.pack(side="left")
         ttk.Entry(bar, textvariable=self.channel_var, width=12).pack(side="left", padx=(4, 8))
         self._on_adapter_change()
+
+        ttk.Label(bar, text="Bitrate").pack(side="left")
+        rate = ttk.Combobox(
+            bar,
+            textvariable=self.bitrate_var,
+            values=tuple(BITRATE_MODE_LABELS[b] for b in BITRATE_MODES),
+            width=22,
+            state="readonly",
+        )
+        rate.pack(side="left", padx=(4, 10))
+        self.bitrate_combo = rate
 
         self.btn_conn = ttk.Button(bar, text="Connect", command=self._toggle)
         self.btn_conn.pack(side="left")
@@ -340,13 +369,18 @@ class SlcanMonitorGui:
         iface = self.interface_var.get().strip() or "slcan"
         channel = parse_channel(iface, self.channel_var.get())
         try:
+            bitrate = parse_bitrate_mode(self.bitrate_var.get())
+        except ValueError as exc:
+            messagebox.showerror("CAN", str(exc))
+            return
+        try:
             if iface == "slcan":
                 bus = can.Bus(interface="slcan", channel=str(channel), sleep_after_open=0.2)
-                bus.set_bitrate(DEFAULT_BITRATE, DEFAULT_DATA_BITRATE)
+                bus.set_bitrate(bitrate, DEFAULT_DATA_BITRATE)
             elif iface == "kvaser":
-                bus = can.Bus(interface="kvaser", channel=channel, bitrate=DEFAULT_BITRATE)
+                bus = can.Bus(interface="kvaser", channel=channel, bitrate=bitrate)
             else:
-                bus = can.Bus(interface=iface, channel=channel, bitrate=DEFAULT_BITRATE)
+                bus = can.Bus(interface=iface, channel=channel, bitrate=bitrate)
         except Exception as exc:
             messagebox.showerror("CAN", f"Could not open {iface}:{channel}:\n{exc}")
             return
@@ -355,7 +389,8 @@ class SlcanMonitorGui:
         self.rx_thread = threading.Thread(target=self._rx_loop, daemon=True)
         self.rx_thread.start()
         self.btn_conn.configure(text="Disconnect")
-        self.status_var.set(f"{iface}:{channel} @ {DEFAULT_BITRATE}")
+        self.bitrate_combo.configure(state="disabled")
+        self.status_var.set(f"{iface}:{channel} @ {bitrate}")
 
     def _disconnect(self) -> None:
         self.stop_event.set()
@@ -367,6 +402,7 @@ class SlcanMonitorGui:
             except Exception:
                 pass
         self.btn_conn.configure(text="Connect")
+        self.bitrate_combo.configure(state="readonly")
         self.status_var.set("Disconnected")
 
     def _rx_loop(self) -> None:
@@ -485,13 +521,25 @@ class SlcanMonitorGui:
 def main() -> None:
     interface = "slcan"
     port = ADAPTER_CHANNEL["slcan"]
-    args = [a for a in sys.argv[1:] if not a.startswith("-")]
+    bitrate = DEFAULT_BITRATE
+    raw_args = list(sys.argv[1:])
+    if "--bitrate" in raw_args:
+        i = raw_args.index("--bitrate")
+        try:
+            bitrate = parse_bitrate_mode(raw_args[i + 1])
+        except (IndexError, ValueError) as exc:
+            print(exc)
+            return
+        del raw_args[i : i + 2]
+    args = [a for a in raw_args if not a.startswith("-")]
     if args and args[0].lower() in ADAPTERS:
         interface = args[0].lower()
         port = args[1] if len(args) > 1 else ADAPTER_CHANNEL[interface]
     elif args:
         port = args[0]
-    SlcanMonitorGui(port, interface).run()
+    gui = SlcanMonitorGui(port, interface)
+    gui.bitrate_var.set(BITRATE_MODE_LABELS[bitrate])
+    gui.run()
 
 
 if __name__ == "__main__":

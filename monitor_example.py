@@ -18,11 +18,20 @@ import time
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python monitor_example.py COM8")
+        print("Usage: python monitor_example.py COM8 [500000|250000]")
         return
 
     port = sys.argv[1]
     bitrate = 500000
+    if len(sys.argv) >= 3:
+        raw = sys.argv[2].strip().lower()
+        if raw.startswith("250"):
+            bitrate = 250000
+        elif raw.startswith("500"):
+            bitrate = 500000
+        else:
+            print("Bitrate must be 500000 or 250000")
+            return
 
     print(f"Connecting to ESP32-C6 SLCAN adapter on {port} @ {bitrate} bps...")
 
