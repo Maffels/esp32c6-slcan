@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """CAN joystick monitor GUI.
 
-Adapter (slcan / kvaser / virtual), latest frame per source, BJM/EJM decode.
+Adapter (slcan / kvaser / ixxat / virtual), latest frame per source, BJM/EJM decode.
 
 Usage:
     python slcan_monitor_gui.py
     python slcan_monitor_gui.py COM8
+    python slcan_monitor_gui.py ixxat 0
     slcan-monitor
 """
 
@@ -49,7 +50,40 @@ def _ensure_kvaser_dll_search_path() -> None:
             break
 
 
+def _ensure_ixxat_dll_search_path() -> None:
+    """VCI vcinpl.dll — python-can ixxat backend (USB-to-CAN V2)."""
+    if sys.platform != "win32":
+        return
+    add_dll_directory = getattr(os, "add_dll_directory", None)
+    if add_dll_directory is None:
+        return
+    candidates = []
+    env_bin = os.environ.get("IXXAT_VCI_BIN") or os.environ.get("IXXAT_BIN")
+    if env_bin:
+        candidates.append(env_bin)
+    program_files = [
+        os.environ.get("ProgramFiles", r"C:\Program Files"),
+        os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"),
+    ]
+    for root in program_files:
+        for rel in (
+            os.path.join("HMS", "Ixxat VCI 4.1", "bin"),
+            os.path.join("HMS", "Ixxat VCI 4.0", "bin"),
+            os.path.join("IXXAT", "VCI 4.1", "bin"),
+            os.path.join("IXXAT", "VCI 4.0", "bin"),
+        ):
+            candidates.append(os.path.join(root, rel))
+    for path in candidates:
+        if path and os.path.isdir(path):
+            try:
+                add_dll_directory(path)
+            except OSError:
+                continue
+            break
+
+
 _ensure_kvaser_dll_search_path()
+_ensure_ixxat_dll_search_path()
 
 import can
 
@@ -61,8 +95,10 @@ PGN_NAMES = {PGN_BJM1: "BJM1", PGN_EJM1: "EJM1", PGN_BJM2: "BJM2"}
 STATUS = {0: "not in pos", 1: "in pos", 2: "error", 3: "n/a"}
 BUTTON = {0: "released", 1: "pressed", 2: "error", 3: "n/a"}
 
-ADAPTERS = ("slcan", "kvaser", "virtual")
-ADAPTER_CHANNEL = {"slcan": "COM8", "kvaser": "0", "virtual": "0"}
+ADAPTERS = ("slcan", "kvaser", "ixxat", "virtual")
+ADAPTER_CHANNEL = {"slcan": "COM8", "kvaser": "0", "ixxat": "0", "virtual": "0"}
+# python-can backends whose channel is an integer (not a COM port).
+INT_CHANNEL_ADAPTERS = ("kvaser", "ixxat")
 
 POLL_MS = 50
 BITRATE_500K = 500000
@@ -189,14 +225,25 @@ def traffic_iid(can_id: int, extended: bool) -> str:
     return f"{1 if extended else 0}:{can_id:08X}"
 
 
+def parse_ixxat_hwid(text: str):
+    """Optional unique_hardware_id from '0:HW441489'. None if omitted."""
+    raw = str(text).strip()
+    if ":" not in raw:
+        return None
+    hwid = raw.split(":", 1)[1].strip()
+    return hwid or None
+
+
 def parse_channel(interface: str, text: str):
     text = text.strip()
-    if interface == "kvaser":
+    if interface == "ixxat" and ":" in text:
+        text = text.split(":", 1)[0].strip()
+    if interface in INT_CHANNEL_ADAPTERS:
         try:
             return int(text)
         except ValueError:
             return text
-    return text or ADAPTER_CHANNEL[interface]
+    return text or ADAPTER_CHANNEL.get(interface, text)
 
 
 @dataclass
@@ -236,7 +283,7 @@ class SlcanMonitorGui:
             bar,
             textvariable=self.interface_var,
             values=ADAPTERS,
-            width=10,
+            width=12,
             state="readonly",
         )
         iface.pack(side="left", padx=(4, 10))
@@ -244,7 +291,7 @@ class SlcanMonitorGui:
 
         self.channel_lbl = ttk.Label(bar, text="Channel")
         self.channel_lbl.pack(side="left")
-        ttk.Entry(bar, textvariable=self.channel_var, width=12).pack(side="left", padx=(4, 8))
+        ttk.Entry(bar, textvariable=self.channel_var, width=16).pack(side="left", padx=(4, 8))
         self._on_adapter_change()
 
         ttk.Label(bar, text="Bitrate").pack(side="left")
@@ -379,6 +426,21 @@ class SlcanMonitorGui:
                 bus.set_bitrate(bitrate, DEFAULT_DATA_BITRATE)
             elif iface == "kvaser":
                 bus = can.Bus(interface="kvaser", channel=channel, bitrate=bitrate)
+            elif iface == "ixxat":
+                # USB-to-CAN V2 via VCI. Channel 0 is CAN-A; Compact has one channel.
+                # extended=True: J1939 29-bit IDs. Larger RX FIFO than the VCI default 16.
+                kwargs = {
+                    "interface": "ixxat",
+                    "channel": channel,
+                    "bitrate": bitrate,
+                    "extended": True,
+                    "rx_fifo_size": 256,
+                    "tx_fifo_size": 16,
+                }
+                hwid = parse_ixxat_hwid(self.channel_var.get())
+                if hwid:
+                    kwargs["unique_hardware_id"] = hwid
+                bus = can.Bus(**kwargs)
             else:
                 bus = can.Bus(interface=iface, channel=channel, bitrate=bitrate)
         except Exception as exc:

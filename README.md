@@ -38,7 +38,13 @@ python slcan_monitor_gui.py
 python slcan_monitor_gui.py COM8
 ```
 
-GUI: pick adapter (slcan / kvaser / virtual) and bitrate **500 kbit/s** (S6, default) or **250 kbit/s** (S5). Latest frame per CAN ID (not a scrollback). Auto-scan BJM1 / EJM1 / BJM2 (type, SA, priority). Select a source for axis/button tables. CLI: `python slcan_monitor_gui.py COM8 --bitrate 250000`.
+GUI: pick adapter (**slcan** / **kvaser** / **ixxat** / virtual) and bitrate **500 kbit/s** (S6, default) or **250 kbit/s** (S5). Latest frame per CAN ID (not a scrollback). Auto-scan BJM1 / EJM1 / BJM2 (type, SA, priority). Select a source for axis/button tables.
+
+- **slcan** — ESP32-C6 adapter, channel = COM port (e.g. `COM8`)
+- **kvaser** — Leaf Light, channel = `0`
+- **ixxat** — USB-to-CAN V2 (HMS VCI, `vcinpl.dll`). Channel `0` is CAN-A (Compact has one channel). Optional hardware id: `0:HW441489`. Needs the IXXAT VCI driver installed.
+
+CLI: `python slcan_monitor_gui.py COM8 --bitrate 250000` or `python slcan_monitor_gui.py ixxat 0`.
 
 Offline: `python -m pytest test_bitrate_modes.py`.
 
