@@ -21,4 +21,4 @@ env/
 Thumbs.db
 
 # ESP-IDF
-idf/sdkconfig.old
+sdkconfig.old
